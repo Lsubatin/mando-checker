@@ -117,9 +117,9 @@ fi
 
 
 if [ $SUCCESS -eq 0 ]; then
-    echo "OK -- Validations terminated successfully, you may proceed with deployment"
+    echo "OK -- Validations completed successfully, you may proceed with deployment"
     exit 0
 else
-    echo "ERROR -- Terminated with failures, please check the logs above for necessary corrections and try again"
+    echo "ERROR -- Validations completed with failures. Check the logs above for necessary corrections and try again"
     exit 1
 fi
