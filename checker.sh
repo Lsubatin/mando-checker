@@ -18,13 +18,21 @@
 echo "Active configuration: "
 gcloud config list
 
-
 function clean () {
     this=$1
     temp="${this%\"}"
     that="${temp#\"}"
     echo "$that"
 }
+
+checkfor='USER INPUT OPTIONAL'
+if [[ "$SOURCE_PROJECT_ID" =~ "$checkfor" ||  "$SOURCE_DATASET" =~ "$checkfor" ]]; then
+    unset SOURCE_PROJECT_ID
+    unset SOURCE_DATASET
+else 
+    SOURCE_PROJECT_ID=$( clean "$SOURCE_PROJECT_ID" )
+    SOURCE_DATASET=$( clean "$SOURCE_DATASET" )
+fi
 
 DEPLOY_PROJECT_ID=$( clean "$DEPLOY_PROJECT_ID" )
 DEPLOY_BUCKET_NAME=$( clean "$DEPLOY_BUCKET_NAME" )
@@ -41,6 +49,9 @@ echo "DEPLOY TEST DATASET: $DEPLOY_TEST_DATASET"
 echo "DEPLOY TEST TABLE: $DEPLOY_TEST_TABLE"
 echo "DEPLOY TEST FILENAME: $DEPLOY_TEST_FILENAME"
 echo "DEPLOY TEST DATASET LOCATION: $DEPLOY_TEST_DATASET_LOCATION"
+echo "Optional parameters"
+echo "SOURCE PROJECT ID: $SOURCE_PROJECT_ID"
+echo "SOURCE DATASET: $SOURCE_DATASET"
 
 declare -i SUCCESS
 SUCCESS=0
@@ -115,6 +126,17 @@ else
     fi
 fi
 
+
+if [[ -n  "${SOURCE_PROJECT_ID}" && -n "${SOURCE_DATASET}" ]]; then 
+    bq ls --project_id "$SOURCE_PROJECT_ID" --dataset_id "$SOURCE_DATASET"
+
+    if [ $? -ne 0 ]; then
+        echo "Error -- Failed to list dataset ${SOURCE_PROJECT_ID}.${SOURCE_DATASET}"
+        SUCCESS=1
+    else
+        echo "OK -- Able to list ${SOURCE_PROJECT_ID}.${SOURCE_DATASET}"
+    fi
+fi
 
 if [ $SUCCESS -eq 0 ]; then
     echo "OK -- Validations completed successfully, you may proceed with deployment"
