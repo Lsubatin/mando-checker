@@ -66,8 +66,10 @@ echo "SOURCE PROJECT ID: $SOURCE_PROJECT_ID"
 echo "SOURCE DATASET: $SOURCE_DATASET"
 echo "LOG BUCKET NAME: $LOG_BUCKET_NAME"
 
+
 declare -i SUCCESS
 SUCCESS=0
+
 
 function validate_bucket() {
     BUCKET_NAME=$(echo "$1" | cut -d'/' -f1 )
@@ -108,6 +110,7 @@ validate_bucket "$DEPLOY_BUCKET_NAME"
 if [[ -n  "${LOG_BUCKET_NAME}" ]]; then 
     validate_bucket "$LOG_BUCKET_NAME"
 fi
+
 
 # Validate we can create dataset
 bq --location "$DEPLOY_TEST_DATASET_LOCATION" mk \
@@ -164,6 +167,7 @@ if [[ -n  "${SOURCE_PROJECT_ID}" && -n "${SOURCE_DATASET}" ]]; then
         echo "OK -- Able to list ${SOURCE_PROJECT_ID}.${SOURCE_DATASET}"
     fi
 fi
+
 
 if [ $SUCCESS -eq 0 ]; then
     echo "OK -- Validations completed successfully, you may proceed with deployment"
