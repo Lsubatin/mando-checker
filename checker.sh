@@ -18,13 +18,34 @@
 echo "Active configuration: "
 gcloud config list
 
-
 function clean () {
     this=$1
     temp="${this%\"}"
     that="${temp#\"}"
     echo "$that"
 }
+
+
+checkfor='USER INPUT REQUIRED'
+if [[ "$DEPLOY_PROJECT_ID" =~ "$checkfor" ||  "$DEPLOY_BUCKET_NAME" =~ "$checkfor" ]]; then
+    echo "DEPLOY_PROJECT_ID and DEPLOY_BUCKET_NAME are required parameters"
+    exit 1
+fi
+
+checkfor='USER INPUT OPTIONAL'
+if [[ "$SOURCE_PROJECT_ID" =~ "$checkfor" ||  "$SOURCE_DATASET" =~ "$checkfor" ]]; then
+    unset SOURCE_PROJECT_ID
+    unset SOURCE_DATASET
+else 
+    SOURCE_PROJECT_ID=$( clean "$SOURCE_PROJECT_ID" )
+    SOURCE_DATASET=$( clean "$SOURCE_DATASET" )
+fi
+
+if [[ "$LOG_BUCKET_NAME" =~ "$checkfor" ]] ; then
+    unset LOG_BUCKET_NAME
+else 
+    LOG_BUCKET_NAME=$( clean "$LOG_BUCKET_NAME" )
+fi
 
 DEPLOY_PROJECT_ID=$( clean "$DEPLOY_PROJECT_ID" )
 DEPLOY_BUCKET_NAME=$( clean "$DEPLOY_BUCKET_NAME" )
@@ -33,7 +54,6 @@ DEPLOY_TEST_TABLE=$( clean "$DEPLOY_TEST_TABLE" )
 DEPLOY_TEST_FILENAME=$( clean "$DEPLOY_TEST_FILENAME" )
 DEPLOY_TEST_DATASET_LOCATION=$( clean "$DEPLOY_TEST_DATASET_LOCATION" )
 
-
 echo "Received parameters:"
 echo "DEPLOY to PROJECT: $DEPLOY_PROJECT_ID"
 echo "DEPLOY BUCKET NAME: $DEPLOY_BUCKET_NAME"
@@ -41,35 +61,54 @@ echo "DEPLOY TEST DATASET: $DEPLOY_TEST_DATASET"
 echo "DEPLOY TEST TABLE: $DEPLOY_TEST_TABLE"
 echo "DEPLOY TEST FILENAME: $DEPLOY_TEST_FILENAME"
 echo "DEPLOY TEST DATASET LOCATION: $DEPLOY_TEST_DATASET_LOCATION"
+echo "Optional parameters"
+echo "SOURCE PROJECT ID: $SOURCE_PROJECT_ID"
+echo "SOURCE DATASET: $SOURCE_DATASET"
+echo "LOG BUCKET NAME: $LOG_BUCKET_NAME"
+
 
 declare -i SUCCESS
 SUCCESS=0
 
-#validate bucket exists
-VALIDATE_BUCKET=$( gsutil ls | grep "gs://$DEPLOY_BUCKET_NAME" )
-if [[ -z  "$VALIDATE_BUCKET" ]]; then
-    echo "Error -- gs://$DEPLOY_BUCKET_NAME not found or accessible"
-    SUCCESS=1
-else
-    # validate we can write objects
-    echo "OK -- Can list bucket gs://$DEPLOY_BUCKET_NAME"
-    touch "$DEPLOY_TEST_FILENAME"
-    echo "This is a test file, safe to delete. $(date)" > "$DEPLOY_TEST_FILENAME"
-    gsutil cp "./$DEPLOY_TEST_FILENAME" "gs://$DEPLOY_BUCKET_NAME"
 
-    VALIDATE_FILE=$( gsutil ls "gs://$DEPLOY_BUCKET_NAME/$DEPLOY_TEST_FILENAME" ) 
-    if [[ -z "$VALIDATE_FILE" ]]; then
-        echo "Error -- Could not create a file in bucket gs://$DEPLOY_BUCKET_NAME . Please ensure SA has correct permisions."
+function validate_bucket() {
+    BUCKET_NAME=$(echo "$1" | cut -d'/' -f1 )
+    BUCKET="$1"
+
+    if [[ ! $(gsutil ls "gs://$BUCKET_NAME") ]] ; then
+        echo "Error -- gs://$BUCKET_NAME not found or accessible"
         SUCCESS=1
-    else 
-        echo "OK -- Can create objects in gs://$DEPLOY_BUCKET_NAME"
-        gsutil rm "gs://${DEPLOY_BUCKET_NAME}/$DEPLOY_TEST_FILENAME"
+    else
+        # validate we can write objects
+        echo "OK -- Can list bucket objects gs://$BUCKET_NAME"
+        touch "$DEPLOY_TEST_FILENAME"
+        echo "This is a test file, safe to delete. $(date)" > "$DEPLOY_TEST_FILENAME"
+        gsutil cp "$DEPLOY_TEST_FILENAME" "gs://$BUCKET/$DEPLOY_TEST_FILENAME"
 
-        if [ $? -ne 0 ]; then
-        echo "Failed to clean up test file gs://$DEPLOY_BUCKET_NAME/$DEPLOY_TEST_FILENAME , please manually remove it"
-        fi 
+        VALIDATE_FILE=$( gsutil ls "gs://$BUCKET/$DEPLOY_TEST_FILENAME" ) 
+        if [[ -z "$VALIDATE_FILE" ]]; then
+            echo "Error -- Could not create a file in bucket gs://$BUCKET . Please ensure SA has correct permisions."
+            SUCCESS=1
+        else 
+            echo "OK -- Can create objects in gs://$BUCKET"
+            gsutil rm "gs://${BUCKET}/${DEPLOY_TEST_FILENAME}"
+
+            if [ $? -ne 0 ]; then
+            echo "Failed to clean up test file gs://${BUCKET}/${DEPLOY_TEST_FILENAME} , please manually remove it"
+            fi 
+        fi
     fi
+
+}
+
+
+#validate bucket exists
+validate_bucket "$DEPLOY_BUCKET_NAME"
+
+if [[ -n  "${LOG_BUCKET_NAME}" ]]; then 
+    validate_bucket "$LOG_BUCKET_NAME"
 fi
+
 
 # Validate we can create dataset
 bq --location "$DEPLOY_TEST_DATASET_LOCATION" mk \
@@ -112,6 +151,18 @@ else
     bq rm -f -r -d "${DEPLOY_PROJECT_ID}:${DEPLOY_TEST_DATASET}"
     if [ $? -ne 0 ]; then
         echo "Failed to clean up dataset ${DEPLOY_PROJECT_ID}:${DEPLOY_TEST_DATASET} -- please remove it manually"
+    fi
+fi
+
+
+if [[ -n  "${SOURCE_PROJECT_ID}" && -n "${SOURCE_DATASET}" ]]; then 
+    bq ls --project_id "$SOURCE_PROJECT_ID" --dataset_id "$SOURCE_DATASET"
+
+    if [ $? -ne 0 ]; then
+        echo "Error -- Failed to list dataset ${SOURCE_PROJECT_ID}.${SOURCE_DATASET}"
+        SUCCESS=1
+    else
+        echo "OK -- Able to list ${SOURCE_PROJECT_ID}.${SOURCE_DATASET}"
     fi
 fi
 
