@@ -25,6 +25,13 @@ function clean () {
     echo "$that"
 }
 
+
+checkfor='USER INPUT REQUIRED'
+if [[ "$DEPLOY_PROJECT_ID" =~ "$checkfor" ||  "$DEPLOY_BUCKET_NAME" =~ "$checkfor" ]]; then
+    echo "DEPLOY_PROJECT_ID and DEPLOY_BUCKET_NAME are required parameters"
+    exit 1
+fi
+
 checkfor='USER INPUT OPTIONAL'
 if [[ "$SOURCE_PROJECT_ID" =~ "$checkfor" ||  "$SOURCE_DATASET" =~ "$checkfor" ]]; then
     unset SOURCE_PROJECT_ID
