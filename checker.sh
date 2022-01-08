@@ -75,7 +75,7 @@ function validate_bucket() {
     BUCKET_NAME=$(echo "$1" | cut -d'/' -f1 )
     BUCKET="$1"
 
-    if [[ ! $(gsutil ls "gs://$BUCKET_NAME") ]] ; then
+    if [[ $(gsutil ls "gs://$BUCKET_NAME") ]] ; then
         echo "Error -- gs://$BUCKET_NAME not found or accessible"
         SUCCESS=1
     else
