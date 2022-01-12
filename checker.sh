@@ -71,11 +71,12 @@ declare -i SUCCESS
 SUCCESS=0
 
 
-function validate_bucket() {
+validate_bucket() {
     BUCKET_NAME=$(echo "$1" | cut -d'/' -f1 )
     BUCKET="$1"
 
-    if [[ ! $(gsutil ls "gs://$BUCKET_NAME") ]] ; then
+    gsutil ls "gs://$BUCKET_NAME"; rc=$?
+    if [ "${rc}" -ne 0 ] ; then
         echo "Error -- gs://$BUCKET_NAME not found or accessible"
         SUCCESS=1
     else
